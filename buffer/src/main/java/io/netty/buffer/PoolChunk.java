@@ -16,6 +16,10 @@
 
 package io.netty.buffer;
 
+import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
+import java.util.Queue;
+
 /**
  * Description of algorithm for PageRun/PoolSubpage allocation from PoolChunk
  *
@@ -107,7 +111,6 @@ final class PoolChunk<T> implements PoolChunkMetric {
     final T memory;
     final boolean unpooled;
     final int offset;
-
     private final byte[] memoryMap;
     private final byte[] depthMap;
     private final PoolSubpage<T>[] subpages;
@@ -121,6 +124,11 @@ final class PoolChunk<T> implements PoolChunkMetric {
     private final int maxSubpageAllocs;
     /** Used to mark memory as unusable */
     private final byte unusable;
+
+    // Use as cache for ByteBuffer created from the memory. These are just duplicates and so are only a container
+    // around the memory itself. These are often needed for operations within the Pooled*DirectByteBuf and so
+    // may produce extra GC, which can be greatly reduced by caching the duplicates.
+    private final Queue<ByteBuffer> cachedNioBuffers = new ArrayDeque<ByteBuffer>();
 
     private int freeBytes;
 
@@ -182,6 +190,18 @@ final class PoolChunk<T> implements PoolChunkMetric {
         chunkSize = size;
         log2ChunkSize = log2(chunkSize);
         maxSubpageAllocs = 0;
+    }
+
+    ByteBuffer pollCachedNioBuffer() {
+        return cachedNioBuffers.poll();
+    }
+
+    void offerCachedNioBuffer(ByteBuffer nioBuffer) {
+        // Only cache if we did not reach the limit yet. If we do just drop it on the floor and let the GC collect
+        // it.
+        if (cachedNioBuffers.size() <= PooledByteBufAllocator.DEFAULT_MAX_CACHED_BYTEBUFFER_PER_CHUNK) {
+            cachedNioBuffers.offer(nioBuffer);
+        }
     }
 
     @SuppressWarnings("unchecked")
