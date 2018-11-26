@@ -56,50 +56,65 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(NioEventLoop.class);
 
+    /**
+     * 硬编码的一个值 清理间隔 TODO 暂时不知道用来干嘛
+     */
     private static final int CLEANUP_INTERVAL = 256; // XXX Hard-coded value, but won't need customization.
 
+    /**
+     * 是否禁用selectorKey的优化 如果不设置默认为false 也就是开启selector优化
+     */
     private static final boolean DISABLE_KEYSET_OPTIMIZATION =
             SystemPropertyUtil.getBoolean("io.netty.noKeySetOptimization", false);
 
+    /**
+     * 小于这个值 则不开户空轮询时重新建selector对象功能
+     */
     private static final int MIN_PREMATURE_SELECTOR_RETURNS = 3;
+    /**
+     * NIO selector 空轮询N次后 自动重建selector的阀值
+     */
     private static final int SELECTOR_AUTO_REBUILD_THRESHOLD;
 
-    private final IntSupplier selectNowSupplier = new IntSupplier() {
-        @Override
-        public int get() throws Exception {
-            return selectNow();
-        }
-    };
+    private final IntSupplier selectNowSupplier = this::selectNow;
+
+//    private final IntSupplier selectNowSupplier = new IntSupplier() {
+//        @Override
+//        public int get() throws Exception {
+//            return selectNow();
+//        }
+//    };
 
     // Workaround for JDK NIO bug.
     //
     // See:
     // - http://bugs.sun.com/view_bug.do?bug_id=6427854
     // - https://github.com/netty/netty/issues/203
+    //解决jdk nio bug epoll 轮询问题
     static {
         final String key = "sun.nio.ch.bugLevel";
         final String buglevel = SystemPropertyUtil.get(key);
         if (buglevel == null) {
             try {
-                AccessController.doPrivileged(new PrivilegedAction<Void>() {
-                    @Override
-                    public Void run() {
-                        System.setProperty(key, "");
-                        return null;
-                    }
+                //提供一个特权访问 sun.nio.ch.bugLevel包清空system 对应key 设置
+                AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
+                    System.setProperty(key, "");
+                    return null;
                 });
             } catch (final SecurityException e) {
                 logger.debug("Unable to get/set System Property: " + key, e);
             }
         }
 
+        //selector自动重建默认阀值 默认512 如果你手动设置了 io.netty.selectorAutoRebuildThreshold这个属性配置 且<3
+        //则不会开启空轮询时新建selector 对象 对应上面的注释
         int selectorAutoRebuildThreshold = SystemPropertyUtil.getInt("io.netty.selectorAutoRebuildThreshold", 512);
         if (selectorAutoRebuildThreshold < MIN_PREMATURE_SELECTOR_RETURNS) {
             selectorAutoRebuildThreshold = 0;
         }
 
         SELECTOR_AUTO_REBUILD_THRESHOLD = selectorAutoRebuildThreshold;
-
+        //打印日志，一般在启动时会打印出配置值
         if (logger.isDebugEnabled()) {
             logger.debug("-Dio.netty.noKeySetOptimization: {}", DISABLE_KEYSET_OPTIMIZATION);
             logger.debug("-Dio.netty.selectorAutoRebuildThreshold: {}", SELECTOR_AUTO_REBUILD_THRESHOLD);
@@ -108,27 +123,52 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     /**
      * The NIO {@link Selector}.
+     * 优化过后的selector
      */
     private Selector selector;
+    /**
+     * 未包装的selector 也就是:原生nio selector
+     */
     private Selector unwrappedSelector;
+
+    /**
+     * netty 经过优化后的selectionKey 集合
+     */
     private SelectedSelectionKeySet selectedKeys;
 
+    /**
+     * SelectorProvider用来创建selector对象
+     */
     private final SelectorProvider provider;
 
     /**
      * Boolean that controls determines if a blocked Selector.select should
      * break out of its selection process. In our case we use a timeout for
      * the select method and the select method will block for that time unless
-     * waken up.
+     * waken up.<br>
+     * 原子的是否唤醒标识:因为唤醒方法 {@link Selector#wakeup()} 开销比较大，通过该标识，减少调用。
      */
     private final AtomicBoolean wakenUp = new AtomicBoolean();
 
+    /**
+     * selector 选择策略
+     */
     private final SelectStrategy selectStrategy;
 
+    /**
+     * channel io事件处理占总任务的比例
+     */
     private volatile int ioRatio = 50;
+    /**
+     * 取消selectionKey的数量
+     */
     private int cancelledKeys;
+    /**
+     * 是否需要再次select的selector对象
+     */
     private boolean needsToSelectAgain;
 
+    //构造函数用来初始化NioEventLoop的成员变量
     NioEventLoop(NioEventLoopGroup parent, Executor executor, SelectorProvider selectorProvider,
                  SelectStrategy strategy, RejectedExecutionHandler rejectedExecutionHandler) {
         super(parent, executor, false, DEFAULT_MAX_PENDING_TASKS, rejectedExecutionHandler);
@@ -139,6 +179,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             throw new NullPointerException("selectStrategy");
         }
         provider = selectorProvider;
+        //创建selector对象
         final SelectorTuple selectorTuple = openSelector();
         selector = selectorTuple.selector;
         unwrappedSelector = selectorTuple.unwrappedSelector;
@@ -265,6 +306,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     @Override
     protected Queue<Runnable> newTaskQueue(int maxPendingTasks) {
         // This event loop never calls takeTask()
+        //重载父类newTaskQueue()方法创建mpsc队列
         return maxPendingTasks == Integer.MAX_VALUE ? PlatformDependent.<Runnable>newMpscQueue()
                                                     : PlatformDependent.<Runnable>newMpscQueue(maxPendingTasks);
     }
@@ -715,7 +757,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     @Override
     protected void wakeup(boolean inEventLoop) {
-        if (!inEventLoop && wakenUp.compareAndSet(false, true)) {
+        //nio中的selector在调用select对channel上的感觉兴趣事件时，是会阻塞的，或者select(int timeout) 阻塞后超时
+        //所以要调用selector的wakeup方法唤醒
+        if (!inEventLoop && wakenUp.compareAndSet(false, true)) {//保证wakeup调用的原子性，不要重复唤醒。
             selector.wakeup();
         }
     }
