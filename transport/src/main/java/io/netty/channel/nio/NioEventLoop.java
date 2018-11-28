@@ -106,7 +106,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             }
         }
 
-        //selector自动重建默认阀值 默认512 如果你手动设置了 io.netty.selectorAutoRebuildThreshold这个属性配置 且<3
+        //selector自动重建的默认阀值 默认512 如果你手动设置了 io.netty.selectorAutoRebuildThreshold这个属性配置 且<3
         //则不会开启空轮询时新建selector 对象 对应上面的注释
         int selectorAutoRebuildThreshold = SystemPropertyUtil.getInt("io.netty.selectorAutoRebuildThreshold", 512);
         if (selectorAutoRebuildThreshold < MIN_PREMATURE_SELECTOR_RETURNS) {
@@ -306,7 +306,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     @Override
     protected Queue<Runnable> newTaskQueue(int maxPendingTasks) {
         // This event loop never calls takeTask()
-        //重载父类newTaskQueue()方法创建mpsc队列
+        //重载父类newTaskQueue()方法创建mpsc队列(多生产者单消费者队列)
         return maxPendingTasks == Integer.MAX_VALUE ? PlatformDependent.<Runnable>newMpscQueue()
                                                     : PlatformDependent.<Runnable>newMpscQueue(maxPendingTasks);
     }
@@ -352,6 +352,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     /**
      * Sets the percentage of the desired amount of time spent for I/O in the event loop.  The default value is
      * {@code 50}, which means the event loop will try to spend the same amount of time for I/O as for non-I/O tasks.
+     * 设置ioRatio值
      */
     public void setIoRatio(int ioRatio) {
         if (ioRatio <= 0 || ioRatio > 100) {
@@ -441,32 +442,50 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     @Override
     protected void run() {
+        //NioEventLoop中最重要的方法
         for (;;) {
             try {
                 try {
                     switch (selectStrategy.calculateStrategy(selectNowSupplier, hasTasks())) {
+                        //默认实现不存在这样的情况
                     case SelectStrategy.CONTINUE:
                         continue;
 
                     case SelectStrategy.BUSY_WAIT:
+                        //nio不支持 "忙等待" 所以和select策略一至
                         // fall-through to SELECT since the busy-wait is not supported with NIO
 
                     case SelectStrategy.SELECT:
+                        //原子重置selector的唤醒标识为false后返回修改前的值,再进行select
                         select(wakenUp.getAndSet(false));
+                        //调用select(boolean oldValue)后 wakenUp 为false
 
                         // 'wakenUp.compareAndSet(false, true)' is always evaluated
                         // before calling 'selector.wakeup()' to reduce the wake-up
                         // overhead. (Selector.wakeup() is an expensive operation.)
+                        /*
+                            在调用'selector.wakeup()'之前使用'wakenUp.compareAndSet(false, true)'
+                            来评估来减少 wake-up 唤醒的开销,因为selector唤醒是昂贵的操作。
+                         */
+
                         //
                         // However, there is a race condition in this approach.
                         // The race condition is triggered when 'wakenUp' is set to
                         // true too early.
+                        /*
+                           但是，这种方法存在竞争条件。 当'wakenUp'太早设置为true 时触发竞争条件
+                        */
+
                         //
                         // 'wakenUp' is set to true too early if:
+                        // 'wakenUp' 如果过早的设置为true:
                         // 1) Selector is waken up between 'wakenUp.set(false)' and
                         //    'selector.select(...)'. (BAD)
+                        // 1:在'wakenUp.set(false)'和'selector.select(...)'之间唤醒selector。(糟糕的)
+
                         // 2) Selector is waken up between 'selector.select(...)' and
                         //    'if (wakenUp.get()) { ... }'. (OK)
+                        // 2:selector 在 'selector.select(...)'和'if(wakenUp.get(){...})' 之间唤醒(这种可以)
                         //
                         // In the first case, 'wakenUp' is set to true and the
                         // following 'selector.select(...)' will wake up immediately.
@@ -475,13 +494,23 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                         // any attempt to wake up the Selector will fail, too, causing
                         // the following 'selector.select(...)' call to block
                         // unnecessarily.
+                        /*
+                            在第1种情况下,'wakenUp' 设置为true,跟随在后面的 'selector.select(...)'将立即被唤醒.
+                            直到'wakenUp'在下一轮再次设置为false，'wakenUp.compareAndSet(false,true)'将失败(这个方法返回false)，
+                            因此任何唤醒selector的尝试都将失败()，导致下面的'selector.select(...)'不必要的调用阻塞.
+                        */
                         //
                         // To fix this problem, we wake up the selector again if wakenUp
                         // is true immediately after selector.select(...).
                         // It is inefficient in that it wakes up the selector for both
                         // the first case (BAD - wake-up required) and the second case
                         // (OK - no wake-up required).
+                        /*
+                            为了修复这样的问题,如果wakenUp在selector.select(...)之后立即为true，我们再次唤醒selector
+                         */
 
+
+                        //如果是已经唤醒状态，立即再次唤醒，原因在上面注释
                         if (wakenUp.get()) {
                             selector.wakeup();
                         }
