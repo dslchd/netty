@@ -371,6 +371,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
      */
     public void rebuildSelector() {
         if (!inEventLoop()) {
+            //只能在eventLoop线程中执行
             execute(this::rebuildSelector0);
             return;
         }
@@ -386,6 +387,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
 
         try {
+            //创建新的selector
             newSelectorTuple = openSelector();
         } catch (Exception e) {
             logger.warn("Failed to create a new Selector.", e);
@@ -393,16 +395,20 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
 
         // Register all channels to the new Selector.
-        int nChannels = 0;
-        for (SelectionKey key: oldSelector.keys()) {
-            Object a = key.attachment();
+        //将注册NioEventLoop上的所有channel，注册到新的selector上
+        int nChannels = 0;//重新注册成功的channel数量
+        for (SelectionKey key: oldSelector.keys()){
+            Object a = key.attachment();//返回附加值 就是一个channel
             try {
                 if (!key.isValid() || key.channel().keyFor(newSelectorTuple.unwrappedSelector) != null) {
+                    //key无效或channel已经在新的selector中存在 直接continue
                     continue;
                 }
 
-                int interestOps = key.interestOps();
+                int interestOps = key.interestOps();//返回此key channel上感兴趣的事件(Ops 操作位)
+                //取消老的SectionKey
                 key.cancel();
+                //注册到新的selector中去
                 SelectionKey newKey = key.channel().register(newSelectorTuple.unwrappedSelector, interestOps, a);
                 if (a instanceof AbstractNioChannel) {
                     // Update SelectionKey
@@ -421,12 +427,13 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 }
             }
         }
-
+        //用新的selector与unwrappedSelector覆盖原来的值
         selector = newSelectorTuple.selector;
         unwrappedSelector = newSelectorTuple.unwrappedSelector;
 
         try {
             // time to close the old selector as everything else is registered to the new one
+            //老selector关闭
             oldSelector.close();
         } catch (Throwable t) {
             if (logger.isWarnEnabled()) {
@@ -588,6 +595,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     private void processSelectedKeys() {
         if (selectedKeys != null) {
+            //使用优化过的selectionKey
             processSelectedKeysOptimized();
         } else {
             processSelectedKeysPlain(selector.selectedKeys());
@@ -669,10 +677,11 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             selectedKeys.keys[i] = null;
 
             final Object a = k.attachment();
-
+            //处理channel中的io事件
             if (a instanceof AbstractNioChannel) {
                 processSelectedKey(k, (AbstractNioChannel) a);
             } else {
+                //使用NioTask处理io事件
                 @SuppressWarnings("unchecked")
                 NioTask<SelectableChannel> task = (NioTask<SelectableChannel>) a;
                 processSelectedKey(k, task);
@@ -829,10 +838,10 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             int selectCnt = 0;
             //记录当前时间
             long currentTimeNanos = System.nanoTime();
-            //select 死亡时间 纳秒
+            //select 死亡时间 纳秒  delayNanos()返回下一个任务距离现在的时间 没有任务时默认1000ms
             long selectDeadLineNanos = currentTimeNanos + delayNanos(currentTimeNanos);
             for (;;) {
-                //select的超时时间
+                //select的超时时间  +500000L 是四舍五入  /1000000L 是转为ms
                 long timeoutMillis = (selectDeadLineNanos - currentTimeNanos + 500000L) / 1000000L;
                 if (timeoutMillis <= 0) {
                     if (selectCnt == 0) {
@@ -850,7 +859,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 //如果有任务加入组更改wakenUp标识成功
                 if (hasTasks() && wakenUp.compareAndSet(false, true)) {
                     selector.selectNow();//不阻塞select一次
-                    selectCnt = 1;
+                    selectCnt = 1;//重置selectCnt计数器
                     break;
                 }
                 //阻塞select:查询channel上是否有就绪的io事件

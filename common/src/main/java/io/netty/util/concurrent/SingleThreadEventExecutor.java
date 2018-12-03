@@ -272,9 +272,11 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private boolean fetchFromScheduledTaskQueue() {
         long nanoTime = AbstractScheduledEventExecutor.nanoTime();
+        //轮询计划任务
         Runnable scheduledTask  = pollScheduledTask(nanoTime);
         while (scheduledTask != null) {
             if (!taskQueue.offer(scheduledTask)) {
+                //如果插入双端队列失败了:意味着queue没有空间了,再返回
                 // No space left in the task queue add it back to the scheduledTaskQueue so we pick it up again.
                 scheduledTaskQueue().add((ScheduledFutureTask<?>) scheduledTask);
                 return false;
@@ -390,26 +392,31 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
      * the tasks in the task queue and returns if it ran longer than {@code timeoutNanos}.
      */
     protected boolean runAllTasks(long timeoutNanos) {
+        //从定时任务队列中获得任务
         fetchFromScheduledTaskQueue();
-        Runnable task = pollTask();
+        Runnable task = pollTask();//获得队列头部的任务
         if (task == null) {
-            afterRunningAllTasks();
+            //如果没有任务，直接返回
+            afterRunningAllTasks();//扩展点
             return false;
         }
-
+        //计算任务的结束时间点
         final long deadline = ScheduledFutureTask.nanoTime() + timeoutNanos;
-        long runTasks = 0;
-        long lastExecutionTime;
+        long runTasks = 0;//执行任务计数
+        long lastExecutionTime;//最后执行时间
         for (;;) {
+            //异步循环执行任务
             safeExecute(task);
 
-            runTasks ++;
+            runTasks ++;//计数累加
 
             // Check timeout every 64 tasks because nanoTime() is relatively expensive.
             // XXX: Hard-coded value - will make it configurable if it is really a problem.
             if ((runTasks & 0x3F) == 0) {
+                //重新获得任务执行时间
                 lastExecutionTime = ScheduledFutureTask.nanoTime();
                 if (lastExecutionTime >= deadline) {
+                    //执行时间大于 deadline 则break for
                     break;
                 }
             }
