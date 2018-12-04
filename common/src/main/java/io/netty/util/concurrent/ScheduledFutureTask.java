@@ -27,9 +27,19 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @SuppressWarnings("ComparableImplementedButEqualsNotOverridden")
 final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFuture<V>, PriorityQueueNode {
+    /**
+     * 任务id
+     */
     private static final AtomicLong nextTaskId = new AtomicLong();
+    /**
+     * 定时任务，开始时间
+     */
     private static final long START_TIME = System.nanoTime();
 
+    /**
+     * 获得相对 {@link #START_TIME} 时间点的时间
+     * @return
+     */
     static long nanoTime() {
         return System.nanoTime() - START_TIME;
     }
@@ -40,9 +50,15 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
         return deadlineNanos < 0 ? Long.MAX_VALUE : deadlineNanos;
     }
 
+    /**
+     * 获得任务id
+     */
     private final long id = nextTaskId.getAndIncrement();
     private long deadlineNanos;
     /* 0 - no repeat, >0 - repeat at fixed rate, <0 - repeat with fixed delay */
+    /**
+     * 任务的执行周期
+     */
     private final long periodNanos;
 
     private int queueIndex = INDEX_NOT_IN_QUEUE;
@@ -84,6 +100,10 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
         return deadlineNanos;
     }
 
+    /**
+     *
+     * @return 返回距离当前时间还有多久才执行，如果为负数，直接返回0
+     */
     public long delayNanos() {
         return Math.max(0, deadlineNanos() - nanoTime());
     }
@@ -120,17 +140,20 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
 
     @Override
     public void run() {
+        //断言必须在eventLoop线程中执行
         assert executor().inEventLoop();
         try {
             if (periodNanos == 0) {
-                if (setUncancellableInternal()) {
-                    V result = task.call();
-                    setSuccessInternal(result);
+                //只执行一次的定时任务
+                if (setUncancellableInternal()) {//设置它为不可取消任务
+                    V result = task.call();//调用
+                    setSuccessInternal(result);//设置调用结果
                 }
             } else {
                 // check if is done as it may was cancelled
                 if (!isCancelled()) {
-                    task.call();
+                    //任务没有取消才调用
+                    task.call();//调用
                     if (!executor().isShutdown()) {
                         long p = periodNanos;
                         if (p > 0) {
@@ -161,6 +184,7 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
         boolean canceled = super.cancel(mayInterruptIfRunning);
+        //取消任务成功，则从队列里面移除这个任务
         if (canceled) {
             ((AbstractScheduledEventExecutor) executor()).removeScheduled(this);
         }

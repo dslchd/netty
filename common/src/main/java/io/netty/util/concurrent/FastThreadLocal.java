@@ -23,8 +23,7 @@ import java.util.IdentityHashMap;
 import java.util.Set;
 
 /**
- * A special variant of {@link ThreadLocal} that yields higher access performance when accessed from a
- * {@link FastThreadLocalThread}.
+ * 一个{@link ThreadLocal}特殊变体,当从{@link FastThreadLocal}访问时,可以提供更快速度.netty对Thread的优化
  * <p>
  * Internally, a {@link FastThreadLocal} uses a constant index in an array, instead of using hash code and hash table,
  * to look for a variable.  Although seemingly very subtle, it yields slight performance advantage over using a hash

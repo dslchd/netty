@@ -42,14 +42,19 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 /**
  * The default {@link ChannelPipeline} implementation.  It is usually created
  * by a {@link Channel} implementation when the {@link Channel} is created.
+ * 默认{@link ChannelPipeline}的实现类,当一个channel创建时通常被创建.
  */
 public class DefaultChannelPipeline implements ChannelPipeline {
 
     static final InternalLogger logger = InternalLoggerFactory.getInstance(DefaultChannelPipeline.class);
-
+    //头名字
     private static final String HEAD_NAME = generateName0(HeadContext.class);
+    //尾名字
     private static final String TAIL_NAME = generateName0(TailContext.class);
 
+    /**
+     * 名字{@link AbstractChannelHandlerContext#name()}的缓存,基于ThreadLocal,用于生成线程中唯一的名字。
+     */
     private static final FastThreadLocal<Map<Class<?>, String>> nameCaches =
             new FastThreadLocal<Map<Class<?>, String>>() {
         @Override
@@ -57,7 +62,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
             return new WeakHashMap<Class<?>, String>();
         }
     };
-
+    /**
+     * 原子引用更新器
+     */
     private static final AtomicReferenceFieldUpdater<DefaultChannelPipeline, MessageSizeEstimator.Handle> ESTIMATOR =
             AtomicReferenceFieldUpdater.newUpdater(
                     DefaultChannelPipeline.class, MessageSizeEstimator.Handle.class, "estimatorHandle");
