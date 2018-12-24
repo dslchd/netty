@@ -174,7 +174,7 @@ import java.util.NoSuchElementException;
  *
  * <ol>
  * <li>协议解码 - 转换字节数据 (e.g. {@link ByteBuf}) 为一个Java Object.</li>
- * <li>协议编解 - 转换一个Java Object为一个字节数据.</li>
+ * <li>协议编码 - 转换一个Java Object为一个字节数据.</li>
  * <li>业务逻辑处理程序 - 执行实际业务逻辑（例如数据库访问）。</li>
  * </ol>
  *

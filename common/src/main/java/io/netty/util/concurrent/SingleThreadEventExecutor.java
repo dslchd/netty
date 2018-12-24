@@ -557,6 +557,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     @Override
     public Future<?> shutdownGracefully(long quietPeriod, long timeout, TimeUnit unit) {
+        //如果静默时间<0
         if (quietPeriod < 0) {
             throw new IllegalArgumentException("quietPeriod: " + quietPeriod + " (expected >= 0)");
         }
@@ -568,8 +569,8 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             throw new NullPointerException("unit");
         }
 
-        if (isShuttingDown()) {
-            return terminationFuture();
+        if (isShuttingDown()) {//正在关闭或者已经关闭
+            return terminationFuture();//正在关闭阻止其它线程
         }
 
         boolean inEventLoop = inEventLoop();

@@ -68,12 +68,28 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     private static final AtomicReferenceFieldUpdater<DefaultChannelPipeline, MessageSizeEstimator.Handle> ESTIMATOR =
             AtomicReferenceFieldUpdater.newUpdater(
                     DefaultChannelPipeline.class, MessageSizeEstimator.Handle.class, "estimatorHandle");
+    /**
+     * head节点
+     */
     final AbstractChannelHandlerContext head;
+    /**
+     * tail节点
+     */
     final AbstractChannelHandlerContext tail;
 
+    /**
+     * 所属channel对象
+     */
     private final Channel channel;
+    /**
+     * 成功的promise对象
+     */
     private final ChannelFuture succeededFuture;
+    /**
+     * 不进行通知的promise对象
+     */
     private final VoidChannelPromise voidPromise;
+
     private final boolean touch = ResourceLeakDetector.isEnabled();
 
     private Map<EventExecutorGroup, EventExecutor> childExecutors;
@@ -85,14 +101,16 @@ public class DefaultChannelPipeline implements ChannelPipeline {
      * all the pending {@link #callHandlerAdded0(AbstractChannelHandlerContext)}.
      *
      * We only keep the head because it is expected that the list is used infrequently and its size is small.
-     * Thus full iterations to do insertions is assumed to be a good compromised to saving memory and tail management
-     * complexity.
+     *      * Thus full iterations to do insertions is assumed to be a good compromised to saving memory and tail management
+     *      * complexity.
+     * 装备添加channelHandler的回调
      */
     private PendingHandlerCallback pendingHandlerCallbackHead;
 
     /**
      * Set to {@code true} once the {@link AbstractChannel} is registered.Once set to {@code true} the value will never
      * change.
+     * 设置true表示{@link AbstractChannel} 已经被注册,一旦设置为true这个值将不会再改变。
      */
     private boolean registered;
 

@@ -47,26 +47,45 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
 
     /**
      * {@link ChannelHandler#handlerAdded(ChannelHandlerContext)} is about to be called.
+     * 准备调用{@link ChannelHandler#handlerAdded(ChannelHandlerContext)} 之前的状态
      */
     private static final int ADD_PENDING = 1;
     /**
      * {@link ChannelHandler#handlerAdded(ChannelHandlerContext)} was called.
+     * 调用{@link ChannelHandler#handlerAdded(ChannelHandlerContext)}之后的状态
      */
     private static final int ADD_COMPLETE = 2;
     /**
      * {@link ChannelHandler#handlerRemoved(ChannelHandlerContext)} was called.
+     * 调用{@link ChannelHandler#handlerRemoved(ChannelHandlerContext)}后的状态
      */
     private static final int REMOVE_COMPLETE = 3;
     /**
      * Neither {@link ChannelHandler#handlerAdded(ChannelHandlerContext)}
      * nor {@link ChannelHandler#handlerRemoved(ChannelHandlerContext)} was called.
+     * 上面两种情况下都没有调用的初始状态 init=0
      */
     private static final int INIT = 0;
 
+    /**
+     * 是否为inbound 类型
+     */
     private final boolean inbound;
+    /**
+     * 是否为outbound 类型
+     */
     private final boolean outbound;
+    /**
+     * 所属默认 DEfaultChannelPipeline对象
+     */
     private final DefaultChannelPipeline pipeline;
+    /**
+     * 名称
+     */
     private final String name;
+    /**
+     * 是否为 OrderedEventExecutor类型
+     */
     private final boolean ordered;
 
     // Will be set to null if no child executor should be used, otherwise it will be set to the
@@ -81,6 +100,9 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
     private Runnable invokeChannelWritableStateChangedTask;
     private Runnable invokeFlushTask;
 
+    /**
+     * handlerState默认状态为INIT
+     */
     private volatile int handlerState = INIT;
 
     AbstractChannelHandlerContext(DefaultChannelPipeline pipeline, EventExecutor executor, String name,
@@ -134,12 +156,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
         if (executor.inEventLoop()) {
             next.invokeChannelRegistered();
         } else {
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    next.invokeChannelRegistered();
-                }
-            });
+            executor.execute(next::invokeChannelRegistered);
         }
     }
 
@@ -963,6 +980,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
     }
 
     final void setAddComplete() {
+        //循环并在cas的保证下安全的更新handlerState的状态为 ADD_COMPLETE
         for (;;) {
             int oldState = handlerState;
             // Ensure we never update when the handlerState is REMOVE_COMPLETE already.
@@ -975,6 +993,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
     }
 
     final void setAddPending() {
+        //由INIT 状态变更新 ADD_PENDING 理论是总是成功 返回true
         boolean updated = HANDLER_STATE_UPDATER.compareAndSet(this, INIT, ADD_PENDING);
         assert updated; // This should always be true as it MUST be called before setAddComplete() or setRemoved().
     }
