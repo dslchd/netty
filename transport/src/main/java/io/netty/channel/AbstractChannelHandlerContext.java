@@ -492,6 +492,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
         if (localAddress == null) {
             throw new NullPointerException("localAddress");
         }
+        //是否为合清的Promise对象
         if (isNotValidPromise(promise, false)) {
             // cancelled
             return promise;
@@ -922,14 +923,15 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
             throw new NullPointerException("promise");
         }
 
-        if (promise.isDone()) {
+        if (promise.isDone()) {//任务已经完成 promise其实是一个future
             // Check if the promise was cancelled and if so signal that the processing of the operation
             // should not be performed.
             //
             // See https://github.com/netty/netty/issues/2349
-            if (promise.isCancelled()) {
+            if (promise.isCancelled()) {//任务被取消
                 return true;
             }
+            //如果不是主动被cancel的任务，那肯定就是发生了异常了，所以抛出异常
             throw new IllegalArgumentException("promise already done: " + promise);
         }
 

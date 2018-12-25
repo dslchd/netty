@@ -467,6 +467,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
     @Override
     public final ChannelPipeline remove(ChannelHandler handler) {
+        //getContexOrDie:获取AbstractChannelHandlerContext 对象
         remove(getContextOrDie(handler));
         return this;
     }
@@ -503,10 +504,10 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     }
 
     private AbstractChannelHandlerContext remove(final AbstractChannelHandlerContext ctx) {
-        assert ctx != head && ctx != tail;
+        assert ctx != head && ctx != tail;//断言不是首尾 hanlder则可以移除
 
-        synchronized (this) {
-            remove0(ctx);
+        synchronized (this) {//防止并发移除时 破坏 pipeline的双向链表
+            remove0(ctx);//执行pipeline双向链表的 指向
 
             // If the registered is false it means that the channel was not registered on an eventloop yet.
             // In this case we remove the context from the pipeline and add a task that will call
@@ -527,7 +528,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
                 return ctx;
             }
         }
-        callHandlerRemoved0(ctx);
+        callHandlerRemoved0(ctx);//执行ChannelHandlerContext的 removeHandler 事件方法
         return ctx;
     }
 
@@ -692,9 +693,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         // Notify the complete removal.
         try {
             try {
-                ctx.handler().handlerRemoved(ctx);
+                ctx.handler().handlerRemoved(ctx);//执行移除事件方法
             } finally {
-                ctx.setRemoved();
+                ctx.setRemoved();//不管执行方法是否成功都要设置为已经移除状态
             }
         } catch (Throwable t) {
             fireExceptionCaught(new ChannelPipelineException(
