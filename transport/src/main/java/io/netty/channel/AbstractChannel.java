@@ -538,6 +538,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         @Override
         public final void bind(final SocketAddress localAddress, final ChannelPromise promise) {
+            //判断是否在EventLoop中
             assertEventLoop();
 
             if (!promise.setUncancellable() || !ensureOpen(promise)) {

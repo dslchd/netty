@@ -26,6 +26,7 @@ import java.util.Map;
 public abstract class ChannelHandlerAdapter implements ChannelHandler {
 
     // Not using volatile because it's used only for a sanity check.
+    // 这个标识之所以不用volatile 是因为 它的修改只在synchronized 块中处理，看源码得出的结论
     boolean added;
 
     /**

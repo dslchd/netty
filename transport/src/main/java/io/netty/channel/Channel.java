@@ -29,32 +29,45 @@ import java.net.SocketAddress;
 
 /**
  * A nexus to a network socket or a component which is capable of I/O
- * operations such as read, write, connect, and bind.
+ *  * operations such as read, write, connect, and bind.
+ *  一个能够处理socket 网络套接字并处理读，写，连接，绑定事件的组件
  * <p>
  * A channel provides a user:
+ * 一个channel 提供用户如下功能
  * <ul>
  * <li>the current state of the channel (e.g. is it open? is it connected?),</li>
+ * <li>channel 当前的状态(e.g. 是打开还是已经连接状态)</li>
  * <li>the {@linkplain ChannelConfig configuration parameters} of the channel (e.g. receive buffer size),</li>
+ * <li>通过{@linkplain ChannelConfig 可以为channel配置一些参数} 比如接收缓存的大小</li>
  * <li>the I/O operations that the channel supports (e.g. read, write, connect, and bind), and</li>
+ * <li>channel 提供一系列io操作，比如:读，写，连接绑定，和通过{@link ChannelPipeline} 来处理所有的i/o 请求事件</li>
  * <li>the {@link ChannelPipeline} which handles all I/O events and requests
  *     associated with the channel.</li>
  * </ul>
  *
- * <h3>All I/O operations are asynchronous.</h3>
+ * <h3>All I/O operations are asynchronous.(所有的I/O操作都是异步进行的)</h3>
  * <p>
  * All I/O operations in Netty are asynchronous.  It means any I/O calls will
  * return immediately with no guarantee that the requested I/O operation has
  * been completed at the end of the call.  Instead, you will be returned with
  * a {@link ChannelFuture} instance which will notify you when the requested I/O
  * operation has succeeded, failed, or canceled.
+ * 在netty里面所有的io操作都是异步进行的，这意味着io操作将立马被返回，而不是要等io操作完成后才返回
+ * 你将会收到立即返回{@link ChannelFuture} 实例，当io操作成功，失败，或被取消时
  *
- * <h3>Channels are hierarchical</h3>
+ *
+ * <h3>Channels are hierarchical(通道是分层的)</h3>
  * <p>
  * A {@link Channel} can have a {@linkplain #parent() parent} depending on
  * how it was created.  For instance, a {@link SocketChannel}, that was accepted
  * by {@link ServerSocketChannel}, will return the {@link ServerSocketChannel}
  * as its parent on {@link #parent()}.
  * <p>
+ * <p>
+ *     {@link Channel} 可以有一个父channel,取决于它被创建的方式，例如:{@link ServerSocketChannel} 接收一个{@link SocketChannel}时
+ *     socketChannel的parent()方法返回的就是 ServerSocketChannel
+ * </p>
+ *
  * The semantics of the hierarchical structure depends on the transport
  * implementation where the {@link Channel} belongs to.  For example, you could
  * write a new {@link Channel} implementation that creates the sub-channels that
@@ -78,17 +91,19 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
 
     /**
      * Returns the globally unique identifier of this {@link Channel}.
+     * 返回全局channel的唯一id标识
      */
     ChannelId id();
 
     /**
      * Return the {@link EventLoop} this {@link Channel} was registered to.
+     * 返回channel 注册在哪一个eventLoop上
      */
     EventLoop eventLoop();
 
     /**
      * Returns the parent of this channel.
-     *
+     * 返回channel的父channel 如果没有返回null
      * @return the parent channel.
      *         {@code null} if this channel does not have a parent channel.
      */
@@ -96,21 +111,25 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
 
     /**
      * Returns the configuration of this channel.
+     * 返回channel的配置参数
      */
     ChannelConfig config();
 
     /**
      * Returns {@code true} if the {@link Channel} is open and may get active later
+     * 返回true表示 channel已经开户后面可能active
      */
     boolean isOpen();
 
     /**
      * Returns {@code true} if the {@link Channel} is registered with an {@link EventLoop}.
+     * 返回true表未channel已经注册到一个EventLoop上了
      */
     boolean isRegistered();
 
     /**
      * Return {@code true} if the {@link Channel} is active and so connected.
+     * 返回true表示channel已经是active状态并可以连接
      */
     boolean isActive();
 
@@ -174,16 +193,19 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
 
     /**
      * Returns an <em>internal-use-only</em> object that provides unsafe operations.
+     * 返回一个仅仅内部可以用的unsafe对象（为什么是Unsafe:因为Netty不建议程序员直接操作这个类）
      */
     Unsafe unsafe();
 
     /**
      * Return the assigned {@link ChannelPipeline}.
+     * 返回channel分配的{@link ChannelPipeline} 用于处理inbound or outbound事件
      */
     ChannelPipeline pipeline();
 
     /**
      * Return the assigned {@link ByteBufAllocator} which will be used to allocate {@link ByteBuf}s.
+     * 返回{@link ByteBufAllocator} 用来处理ByteBuf
      */
     ByteBufAllocator alloc();
 
