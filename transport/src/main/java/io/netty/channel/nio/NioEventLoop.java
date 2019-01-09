@@ -699,8 +699,8 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     }
 
     private void processSelectedKey(SelectionKey k, AbstractNioChannel ch) {
-        final AbstractNioChannel.NioUnsafe unsafe = ch.unsafe();
-        if (!k.isValid()) {
+        final AbstractNioChannel.NioUnsafe unsafe = ch.unsafe();//获得Unsafe对象
+        if (!k.isValid()) {//不是有效的SelectionKey
             final EventLoop eventLoop;
             try {
                 eventLoop = ch.eventLoop();
@@ -717,11 +717,11 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             if (eventLoop != this || eventLoop == null) {
                 return;
             }
-            // close the channel if the key is not valid anymore
+            // close the channel if the key is not valid anymore 关闭channel
             unsafe.close(unsafe.voidPromise());
             return;
         }
-
+        //核心逻辑:通过SelectionKey检测io事件
         try {
             int readyOps = k.readyOps();
             // We first need to call finishConnect() before try to trigger a read(...) or write(...) as otherwise
@@ -744,8 +744,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
             // Also check for readOps of 0 to workaround possible JDK bug which may otherwise lead
             // to a spin loop
+            //read 或 accept操作就绪时触发 read()动作，readyOps==0是防止Jdk空轮询处理
             if ((readyOps & (SelectionKey.OP_READ | SelectionKey.OP_ACCEPT)) != 0 || readyOps == 0) {
-                unsafe.read();
+                unsafe.read();//调用unsafe进行读取操作
             }
         } catch (CancelledKeyException ignored) {
             unsafe.close(unsafe.voidPromise());

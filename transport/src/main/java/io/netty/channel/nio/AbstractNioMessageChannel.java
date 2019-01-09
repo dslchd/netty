@@ -64,6 +64,7 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
             assert eventLoop().inEventLoop();
             final ChannelConfig config = config();
             final ChannelPipeline pipeline = pipeline();
+            //获得RecvByteBufAllocator.Handler对象 说明NioMessageUnsafe也是属性服务端Unsafe处理类
             final RecvByteBufAllocator.Handle allocHandle = unsafe().recvBufAllocHandle();
             allocHandle.reset(config);
 
@@ -72,34 +73,38 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
             try {
                 try {
                     do {
+                        //读取客户端的连接到readBuf中,其实里面存的是NioServerSocketChannel
                         int localRead = doReadMessages(readBuf);
+                        //没数据break出去
                         if (localRead == 0) {
                             break;
                         }
+                        //读取异常 关闭 并break出去
                         if (localRead < 0) {
                             closed = true;
                             break;
                         }
-
+                        //只要不是上面2种情况则增加已经读取的连接数
                         allocHandle.incMessagesRead(localRead);
                     } while (allocHandle.continueReading());
                 } catch (Throwable t) {
                     exception = t;
                 }
 
+                //循环readBuf并传播channel read事件到pipeline中去
                 int size = readBuf.size();
                 for (int i = 0; i < size; i ++) {
                     readPending = false;
                     pipeline.fireChannelRead(readBuf.get(i));
                 }
-                readBuf.clear();
-                allocHandle.readComplete();
-                pipeline.fireChannelReadComplete();
+                readBuf.clear();//完成后清理 readBuf 数组
+                allocHandle.readComplete();//设置allocHandle为读取完成
+                pipeline.fireChannelReadComplete();//触发读取链接完成事件，并传播下去
 
                 if (exception != null) {
                     closed = closeOnReadError(exception);
 
-                    pipeline.fireExceptionCaught(exception);
+                    pipeline.fireExceptionCaught(exception);//如果上面的过程中出现了异常，则在pipeline中传播异常事件
                 }
 
                 if (closed) {
