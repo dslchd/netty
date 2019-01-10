@@ -81,11 +81,11 @@ public abstract class AbstractNioChannel extends AbstractChannel {
      * @param readInterestOp    the ops to set to receive data from the {@link SelectableChannel}
      */
     protected AbstractNioChannel(Channel parent, SelectableChannel ch, int readInterestOp) {
-        super(parent);
+        super(parent);//这里初始化parent unsafe pipeline这些
         this.ch = ch;
-        this.readInterestOp = readInterestOp;
+        this.readInterestOp = readInterestOp;//设置读事件
         try {
-            ch.configureBlocking(false);
+            ch.configureBlocking(false);//将jdk channel设置为非阻塞状态
         } catch (IOException e) {
             try {
                 ch.close();

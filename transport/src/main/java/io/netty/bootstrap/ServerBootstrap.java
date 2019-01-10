@@ -241,26 +241,27 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         @Override
         @SuppressWarnings("unchecked")
         public void channelRead(ChannelHandlerContext ctx, Object msg) {
+            //一上来直接将NioSocketChannel转成channel
             final Channel child = (Channel) msg;
 
-            child.pipeline().addLast(childHandler);
-
+            child.pipeline().addLast(childHandler);//添加用户代码定义的channelHandler 链
+            //设置配置项
             setChannelOptions(child, childOptions, logger);
-
+            //设置属性
             for (Entry<AttributeKey<?>, Object> e: childAttrs) {
                 child.attr((AttributeKey<Object>) e.getKey()).set(e.getValue());
             }
 
             try {
-                childGroup.register(child).addListener(new ChannelFutureListener() {
-                    @Override
-                    public void operationComplete(ChannelFuture future) throws Exception {
-                        if (!future.isSuccess()) {
-                            forceClose(child, future.cause());
-                        }
+                //这里注册已经Acceptor的NioSocketChannel到 worker reactor线程中去
+                childGroup.register(child).addListener((ChannelFutureListener) future -> {
+                    if (!future.isSuccess()) {
+                        //添加一个监听在注册失败的时候 关闭NioSocketChannel
+                        forceClose(child, future.cause());
                     }
                 });
             } catch (Throwable t) {
+                //同样，发生生了异常，也要强制关闭NioSocketChannel
                 forceClose(child, t);
             }
         }
