@@ -141,13 +141,17 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             allocHandle.reset(config);
 
             ByteBuf byteBuf = null;
-            boolean close = false;
+            boolean close = false;//是否关闭对象
             try {
+                //循环读取
                 do {
+                    //申请ByteBuf对象
                     byteBuf = allocHandle.allocate(allocator);
+                    //设置最后读取字节数
                     allocHandle.lastBytesRead(doReadBytes(byteBuf));
                     if (allocHandle.lastBytesRead() <= 0) {
                         // nothing was read. release the buffer.
+                        //没有可读的字节了，释放buffer
                         byteBuf.release();
                         byteBuf = null;
                         close = allocHandle.lastBytesRead() < 0;

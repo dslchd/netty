@@ -726,6 +726,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
         }
 
         try {
+            //检测是否为有效Promise
             if (isNotValidPromise(promise, true)) {
                 ReferenceCountUtil.release(msg);
                 // cancelled

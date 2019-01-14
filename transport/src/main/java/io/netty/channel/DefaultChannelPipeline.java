@@ -1096,6 +1096,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
     @Override
     public final ChannelFuture write(Object msg) {
+        //由tailHandlerContext发起  tail---->head
         return tail.write(msg);
     }
 
