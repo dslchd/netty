@@ -42,6 +42,7 @@ import static java.lang.Math.min;
  * outbound write requests.
  * <p>
  * All methods must be called by a transport implementation from an I/O thread, except the following ones:
+ * 所有的方法必须由io线程传输调用，除了以下几个方法
  * <ul>
  * <li>{@link #size()} and {@link #isEmpty()}</li>
  * <li>{@link #isWritable()}</li>

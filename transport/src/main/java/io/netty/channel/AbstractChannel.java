@@ -864,6 +864,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         @Override
         public final void write(Object msg, ChannelPromise promise) {
+            //断言是否在EventLoop中执行
             assertEventLoop();
 
             ChannelOutboundBuffer outboundBuffer = this.outboundBuffer;
@@ -871,16 +872,21 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 // If the outboundBuffer is null we know the channel was closed and so
                 // need to fail the future right away. If it is not null the handling of the rest
                 // will be done in flush0()
+                //如果outboundBuffer 为null 我们知道一般是由于channel被close引起的，所有必须要立马失败
+                //如果不为null则由flush0()完成后面的处理。
                 // See https://github.com/netty/netty/issues/2362
                 safeSetFailure(promise, WRITE_CLOSED_CHANNEL_EXCEPTION);
                 // release message now to prevent resource-leak
+                // 释放message 防止资源泄漏
                 ReferenceCountUtil.release(msg);
                 return;
             }
 
             int size;
             try {
+                //过滤写入的消息
                 msg = filterOutboundMessage(msg);
+                //计算消息长度
                 size = pipeline.estimatorHandle().size(msg);
                 if (size < 0) {
                     size = 0;
@@ -890,7 +896,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 ReferenceCountUtil.release(msg);
                 return;
             }
-
+            //写入消息到内存队列中 outboundBuffer 是一个netty优化过的Entry 可以不必深入
             outboundBuffer.addMessage(msg, size, promise);
         }
 
@@ -910,17 +916,19 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         @SuppressWarnings("deprecation")
         protected void flush0() {
             if (inFlush0) {
-                // Avoid re-entrance
+                // Avoid re-entrance 在flush中 直接返回 避免重入
                 return;
             }
 
             final ChannelOutboundBuffer outboundBuffer = this.outboundBuffer;
             if (outboundBuffer == null || outboundBuffer.isEmpty()) {
+                //内存队列为空也返回
                 return;
             }
-
+            //设置Flush中状态为true
             inFlush0 = true;
 
+            //未激活的channel写入flush失败信息
             // Mark all pending write requests as failure if the channel is inactive.
             if (!isActive()) {
                 try {
@@ -931,14 +939,17 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                         outboundBuffer.failFlushed(FLUSH0_CLOSED_CHANNEL_EXCEPTION, false);
                     }
                 } finally {
+                    //还原inFlush0状态
                     inFlush0 = false;
                 }
                 return;
             }
 
             try {
+                //执行真正的写入到对端逻辑
                 doWrite(outboundBuffer);
             } catch (Throwable t) {
+                //异常处理
                 if (t instanceof IOException && config().isAutoClose()) {
                     /**
                      * Just call {@link #close(ChannelPromise, Throwable, boolean)} here which will take care of
@@ -957,7 +968,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     }
                 }
             } finally {
-                inFlush0 = false;
+                inFlush0 = false;//一样还原inFlush0状态
             }
         }
 

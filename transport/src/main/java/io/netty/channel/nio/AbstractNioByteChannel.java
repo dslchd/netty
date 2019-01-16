@@ -273,9 +273,10 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
         if (msg instanceof ByteBuf) {
             ByteBuf buf = (ByteBuf) msg;
             if (buf.isDirect()) {
+                //如果byteBuf属于直接内存 就直接返回
                 return msg;
             }
-
+            //不是直接内存 封装成DirectBuffer 然后返回 直接内存ByteBuf没有copy的过程，性能好
             return newDirectBuffer(buf);
         }
 

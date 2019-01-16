@@ -374,12 +374,13 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
 
     @Override
     protected void doWrite(ChannelOutboundBuffer in) throws Exception {
-        SocketChannel ch = javaChannel();
-        int writeSpinCount = config().getWriteSpinCount();
+        SocketChannel ch = javaChannel();//取nio的SocketChannel
+        int writeSpinCount = config().getWriteSpinCount();//获得自旋写入的次数 默认为16
+        //do while 循环写入
         do {
-            if (in.isEmpty()) {
+            if (in.isEmpty()) {//直接内存队列无数据
                 // All written so clear OP_WRITE
-                clearOpWrite();
+                clearOpWrite();//取消SelectionKey.OP_WRITE 感兴趣事件
                 // Directly return here so incompleteWrite(...) is not called.
                 return;
             }

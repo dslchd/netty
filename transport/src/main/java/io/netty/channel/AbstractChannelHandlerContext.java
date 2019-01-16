@@ -726,10 +726,10 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
         }
 
         try {
-            //检测是否为有效Promise
+            //检测是否为合法promise
             if (isNotValidPromise(promise, true)) {
+                //释放msg上关资源
                 ReferenceCountUtil.release(msg);
-                // cancelled
                 return promise;
             }
         } catch (RuntimeException e) {
@@ -822,9 +822,12 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
     }
 
     private void write(Object msg, boolean flush, ChannelPromise promise) {
+        //查找下一个outbound结点
         AbstractChannelHandlerContext next = findContextOutbound();
+        //根据引用计数器touch一个object
         final Object m = pipeline.touch(msg, next);
         EventExecutor executor = next.executor();
+        //在EventLoop中
         if (executor.inEventLoop()) {
             if (flush) {
                 next.invokeWriteAndFlush(m, promise);
@@ -963,6 +966,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
         return ctx;
     }
 
+    //查找pipeline链上的下一个outbound结点
     private AbstractChannelHandlerContext findContextOutbound() {
         AbstractChannelHandlerContext ctx = this;
         //因为outbound全部是prev指针，返回最近的outbound节点
