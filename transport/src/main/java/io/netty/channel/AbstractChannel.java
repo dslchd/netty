@@ -689,76 +689,71 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             pipeline.fireUserEventTriggered(ChannelOutputShutdownEvent.INSTANCE);
         }
 
+        //真正的channel close 处理
         private void close(final ChannelPromise promise, final Throwable cause,
                            final ClosedChannelException closeCause, final boolean notify) {
+            //要关闭channel了 先设置promise为不可取消
             if (!promise.setUncancellable()) {
                 return;
             }
 
-            if (closeInitiated) {
+            if (closeInitiated) {//如果关闭初始化标识=true
                 if (closeFuture.isDone()) {
-                    // Closed already.
-                    safeSetSuccess(promise);
+                    // Closed already. //已经关闭了
+                    safeSetSuccess(promise);//安全的设置promise状态为success
                 } else if (!(promise instanceof VoidChannelPromise)) { // Only needed if no VoidChannelPromise.
                     // This means close() was called before so we just register a listener and return
-                    closeFuture.addListener(new ChannelFutureListener() {
-                        @Override
-                        public void operationComplete(ChannelFuture future) throws Exception {
-                            promise.setSuccess();
-                        }
-                    });
+                    //关闭未完成且promise 不是 VoidChannelPromise的话 添加一个监听去设置promise状态
+                    closeFuture.addListener((ChannelFutureListener) future -> promise.setSuccess());
                 }
-                return;
+                return;//返回
             }
-
+            //如果事先并未初始close,则执行close过程 标记 closeInitiated=true
             closeInitiated = true;
 
-            final boolean wasActive = isActive();
+            final boolean wasActive = isActive();//是否是已激活的Channel
+            //outboundBuffer 内存刷新队列
             final ChannelOutboundBuffer outboundBuffer = this.outboundBuffer;
+            //设置Null 禁示任何消息刷入到outboundBuffer中
             this.outboundBuffer = null; // Disallow adding any messages and flushes to outboundBuffer.
+            //执行准备关闭动作
             Executor closeExecutor = prepareToClose();
-            if (closeExecutor != null) {
-                closeExecutor.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            // Execute the close.
-                            doClose0(promise);
-                        } finally {
-                            // Call invokeLater so closeAndDeregister is executed in the EventLoop again!
-                            invokeLater(new Runnable() {
-                                @Override
-                                public void run() {
-                                    if (outboundBuffer != null) {
-                                        // Fail all the queued messages
-                                        outboundBuffer.failFlushed(cause, notify);
-                                        outboundBuffer.close(closeCause);
-                                    }
-                                    fireChannelInactiveAndDeregister(wasActive);
-                                }
-                            });
-                        }
+            if (closeExecutor != null) {//这里说明关闭成功
+                closeExecutor.execute(() -> {
+                    try {
+                        // Execute the close.
+                        doClose0(promise);//在closeExecutor上注册一个doClose0()事件,为什么要这样：因为socket设置了延迟关闭
+                    } finally {
+                        // Call invokeLater so closeAndDeregister is executed in the EventLoop again!
+                        invokeLater(() -> {
+                            if (outboundBuffer != null) {
+                                // Fail all the queued messages
+                                outboundBuffer.failFlushed(cause, notify);
+                                outboundBuffer.close(closeCause);
+                            }
+                            fireChannelInactiveAndDeregister(wasActive);
+                        });
                     }
                 });
             } else {
+                //为null的情况,这也是一般的情况，因为我们一般不设置SO_LINGER这个参数
                 try {
                     // Close the channel and fail the queued messages in all cases.
+                    // 这个关闭是在所有情况下关闭，并失败队列上的消息
                     doClose0(promise);
                 } finally {
                     if (outboundBuffer != null) {
                         // Fail all the queued messages.
                         outboundBuffer.failFlushed(cause, notify);
+                        //关闭内存队列
                         outboundBuffer.close(closeCause);
                     }
                 }
-                if (inFlush0) {
-                    invokeLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            fireChannelInactiveAndDeregister(wasActive);
-                        }
-                    });
+                if (inFlush0) {//如果正在flush中...
+                    //提交一个fireChannelInactiveAndDeregister事件到pipeline中去
+                    invokeLater(() -> fireChannelInactiveAndDeregister(wasActive));
                 } else {
+                    //不是的话，直接处理
                     fireChannelInactiveAndDeregister(wasActive);
                 }
             }
@@ -766,8 +761,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         private void doClose0(ChannelPromise promise) {
             try {
+                //执行关闭
                 doClose();
                 closeFuture.setClosed();
+                //通知promise关闭成功
                 safeSetSuccess(promise);
             } catch (Throwable t) {
                 closeFuture.setClosed();
@@ -820,11 +817,13 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 @Override
                 public void run() {
                     try {
-                        doDeregister();
+                        //全都是异步处理的
+                        doDeregister();//反注册,预留扩展点,没有的话，其实也是 SocketChannel的cancel 处理
                     } catch (Throwable t) {
                         logger.warn("Unexpected exception occurred while deregistering a channel.", t);
                     } finally {
                         if (fireChannelInactive) {
+                            //传播pipeline的fireChannelInactive事件
                             pipeline.fireChannelInactive();
                         }
                         // Some transports like local and AIO does not allow the deregistration of

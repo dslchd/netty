@@ -337,7 +337,7 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
     @Override
     protected void doClose() throws Exception {
         super.doClose();
-        javaChannel().close();
+        javaChannel().close();// jdk nio SocketChannel close
     }
 
     @Override
@@ -386,9 +386,11 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
             }
 
             // Ensure the pending writes are made of ByteBufs only.
+            // 获取每次最大可写数据长度
             int maxBytesPerGatheringWrite = ((NioSocketChannelConfig) config).getMaxBytesPerGatheringWrite();
+            // 可写入直接内存ByteBuffer数组
             ByteBuffer[] nioBuffers = in.nioBuffers(1024, maxBytesPerGatheringWrite);
-            int nioBufferCnt = in.nioBufferCount();
+            int nioBufferCnt = in.nioBufferCount();//已写满ByteBuffer数组个数
 
             // Always us nioBuffers() to workaround data-corruption.
             // See https://github.com/netty/netty/issues/2761
@@ -445,12 +447,14 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
         @Override
         protected Executor prepareToClose() {
             try {
+                //真正nio中的SocketChannel的关闭处理
+                //channel必须是Open状态 且socket关闭延迟设置必须>0
                 if (javaChannel().isOpen() && config().getSoLinger() > 0) {
                     // We need to cancel this key of the channel so we may not end up in a eventloop spin
-                    // because we try to read or write until the actual close happens which may be later due
-                    // SO_LINGER handling.
+                    //                    // because we try to read or write until the actual close happens which may be later due
+                    //                    // SO_LINGER handling.
                     // See https://github.com/netty/netty/issues/4449
-                    doDeregister();
+                    doDeregister();//执行取消注册,实际上是在nio SocketChannel中 cancel channel的io事件不再感兴趣了
                     return GlobalEventExecutor.INSTANCE;
                 }
             } catch (Throwable ignore) {
