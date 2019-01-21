@@ -568,6 +568,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
 
     @Override
     public ChannelFuture disconnect(final ChannelPromise promise) {
+        //是否为合法的promise对象
         if (isNotValidPromise(promise, false)) {
             // cancelled
             return promise;
@@ -924,7 +925,8 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
             throw new NullPointerException("promise");
         }
 
-        if (promise.isDone()) {//任务已经完成 promise其实是一个future
+        if (promise.isDone()) {
+            //任务已经完成 promise其实是一个future
             // Check if the promise was cancelled and if so signal that the processing of the operation
             // should not be performed.
             //
@@ -941,6 +943,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
                     "promise.channel does not match: %s (expected: %s)", promise.channel(), channel()));
         }
 
+        //一般情况都是DefaultChannelPromise
         if (promise.getClass() == DefaultChannelPromise.class) {
             return false;
         }

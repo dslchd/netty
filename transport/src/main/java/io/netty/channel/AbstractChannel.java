@@ -697,7 +697,8 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
-            if (closeInitiated) {//如果关闭初始化标识=true
+            //如果关闭初始化标识=true
+            if (closeInitiated) {
                 if (closeFuture.isDone()) {
                     // Closed already. //已经关闭了
                     safeSetSuccess(promise);//安全的设置promise状态为success
@@ -795,10 +796,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         }
 
         private void deregister(final ChannelPromise promise, final boolean fireChannelInactive) {
+
             if (!promise.setUncancellable()) {
                 return;
             }
-
             if (!registered) {
                 safeSetSuccess(promise);
                 return;

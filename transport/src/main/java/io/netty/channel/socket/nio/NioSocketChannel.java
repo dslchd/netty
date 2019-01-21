@@ -448,7 +448,7 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
         protected Executor prepareToClose() {
             try {
                 //真正nio中的SocketChannel的关闭处理
-                //channel必须是Open状态 且socket关闭延迟设置必须>0
+                //channel必须是Open状态 且socket关闭延迟设置必须>0 设置了SO_LINGER 参数
                 if (javaChannel().isOpen() && config().getSoLinger() > 0) {
                     // We need to cancel this key of the channel so we may not end up in a eventloop spin
                     //                    // because we try to read or write until the actual close happens which may be later due

@@ -250,6 +250,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
 
     /**
      * Returns the number of bytes (octets) this buffer can contain.
+     * 返回buffer包含的字节数:当前容量
      */
     public abstract int capacity();
 
@@ -258,6 +259,8 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * capacity, the content of this buffer is truncated.  If the {@code newCapacity} is greater
      * than the current capacity, the buffer is appended with unspecified data whose length is
      * {@code (newCapacity - currentCapacity)}.
+     * 调整ByteBuf容量 如果newCapacity 小于 原来的容量，则会较少原来的容量为新newCapacity,如果newCapacity大于原来</br>
+     * 容量 则会appended (newCapacity-oldCapacity)大小的容量
      */
     public abstract ByteBuf capacity(int newCapacity);
 
@@ -266,11 +269,13 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * capacity of this buffer beyond the maximum capacity using {@link #capacity(int)} or
      * {@link #ensureWritable(int)}, those methods will raise an
      * {@link IllegalArgumentException}.
+     * 最大容量
      */
     public abstract int maxCapacity();
 
     /**
      * Returns the {@link ByteBufAllocator} which created this buffer.
+     * 用于创建ByteBuf的分配器
      */
     public abstract ByteBufAllocator alloc();
 
@@ -300,29 +305,32 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
 
     /**
      * Return the underlying buffer instance if this buffer is a wrapper of another buffer.
-     *
+     * 返回底层未包装底层ByteBuf
      * @return {@code null} if this buffer is not a wrapper
      */
     public abstract ByteBuf unwrap();
 
     /**
      * Returns {@code true} if and only if this buffer is backed by an
-     * NIO direct buffer.
+     * NIO direct buffer. 判断是否为DirectBuffer:即非jvm堆内存
      */
     public abstract boolean isDirect();
 
     /**
      * Returns {@code true} if and only if this buffer is read-only.
+     * 是否为只读Buffer
      */
     public abstract boolean isReadOnly();
 
     /**
      * Returns a read-only version of this buffer.
+     * 返回一个只读版本的Buffer
      */
     public abstract ByteBuf asReadOnly();
 
     /**
      * Returns the {@code readerIndex} of this buffer.
+     * 读指针位置
      */
     public abstract int readerIndex();
 
@@ -338,6 +346,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
 
     /**
      * Returns the {@code writerIndex} of this buffer.
+     * 写指针位置
      */
     public abstract int writerIndex();
 
@@ -402,16 +411,18 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      *         {@code readerIndex} or if the specified {@code writerIndex} is
      *         greater than {@code this.capacity}
      */
-    public abstract ByteBuf setIndex(int readerIndex, int writerIndex);
+    public abstract ByteBuf setIndex(int readerIndex, int writerIndex);//设置读写指针位置
 
     /**
      * Returns the number of readable bytes which is equal to
+     * 剩余可读字节数
      * {@code (this.writerIndex - this.readerIndex)}.
      */
     public abstract int readableBytes();
 
     /**
      * Returns the number of writable bytes which is equal to
+     * 剩余可写字节数 capacity-writeIndex
      * {@code (this.capacity - this.writerIndex)}.
      */
     public abstract int writableBytes();
