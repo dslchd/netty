@@ -63,13 +63,17 @@ public abstract class AbstractByteBuf extends ByteBuf {
         }
     }
 
+    //资源泄漏侦听器
     static final ResourceLeakDetector<ByteBuf> leakDetector =
             ResourceLeakDetectorFactory.instance().newResourceLeakDetector(ByteBuf.class);
 
+    //读索引
     int readerIndex;
+    //写索引
     int writerIndex;
     private int markedReaderIndex;
     private int markedWriterIndex;
+    //最大容量
     private int maxCapacity;
 
     protected AbstractByteBuf(int maxCapacity) {
@@ -107,6 +111,7 @@ public abstract class AbstractByteBuf extends ByteBuf {
         return readerIndex;
     }
 
+    //检查索引是否越界
     private static void checkIndexBounds(final int readerIndex, final int writerIndex, final int capacity) {
         if (readerIndex < 0 || readerIndex > writerIndex || writerIndex > capacity) {
             throw new IndexOutOfBoundsException(String.format(
@@ -115,6 +120,7 @@ public abstract class AbstractByteBuf extends ByteBuf {
         }
     }
 
+    //设置读索引位置
     @Override
     public ByteBuf readerIndex(int readerIndex) {
         if (checkBounds) {
@@ -129,6 +135,7 @@ public abstract class AbstractByteBuf extends ByteBuf {
         return writerIndex;
     }
 
+    //设置写索引位置
     @Override
     public ByteBuf writerIndex(int writerIndex) {
         if (checkBounds) {
@@ -138,6 +145,7 @@ public abstract class AbstractByteBuf extends ByteBuf {
         return this;
     }
 
+    //读写索引 一起给设置了
     @Override
     public ByteBuf setIndex(int readerIndex, int writerIndex) {
         if (checkBounds) {
@@ -149,6 +157,7 @@ public abstract class AbstractByteBuf extends ByteBuf {
 
     @Override
     public ByteBuf clear() {
+        //清空操作 读写索引都置0
         readerIndex = writerIndex = 0;
         return this;
     }
@@ -212,13 +221,14 @@ public abstract class AbstractByteBuf extends ByteBuf {
         return this;
     }
 
+    //释放已经读空间
     @Override
     public ByteBuf discardReadBytes() {
-        ensureAccessible();
-        if (readerIndex == 0) {
+        ensureAccessible();//确保可以访问
+        if (readerIndex == 0) {//读索引为0，直接返回
             return this;
         }
-
+        //0-------------|R|-----------------|W|-------------|capacity|----------------|maxCapacity|
         if (readerIndex != writerIndex) {
             setBytes(0, this, readerIndex, writerIndex - readerIndex);
             writerIndex -= readerIndex;
@@ -269,6 +279,7 @@ public abstract class AbstractByteBuf extends ByteBuf {
         }
     }
 
+    //确保可写入minWritableBytes
     @Override
     public ByteBuf ensureWritable(int minWritableBytes) {
         if (minWritableBytes < 0) {
@@ -282,16 +293,18 @@ public abstract class AbstractByteBuf extends ByteBuf {
     final void ensureWritable0(int minWritableBytes) {
         ensureAccessible();
         if (minWritableBytes <= writableBytes()) {
+            //小于当前可写字节数 可以
             return;
         }
         if (checkBounds) {
             if (minWritableBytes > maxCapacity - writerIndex) {
+                //容量不够了 扩容都不行
                 throw new IndexOutOfBoundsException(String.format(
                         "writerIndex(%d) + minWritableBytes(%d) exceeds maxCapacity(%d): %s",
                         writerIndex, minWritableBytes, maxCapacity, this));
             }
         }
-
+        //自动扩容为当前capacity的2倍
         // Normalize the current capacity to the power of 2.
         int newCapacity = alloc().calculateNewCapacity(writerIndex + minWritableBytes, maxCapacity);
 
@@ -314,19 +327,21 @@ public abstract class AbstractByteBuf extends ByteBuf {
         final int maxCapacity = maxCapacity();
         final int writerIndex = writerIndex();
         if (minWritableBytes > maxCapacity - writerIndex) {
+            //超过最大可写容量
             if (!force || capacity() == maxCapacity) {
+                //非强制设置或已达最高容量 返回1
                 return 1;
             }
-
+            //force=true 强制调整为maxCapacity
             capacity(maxCapacity);
-            return 3;
+            return 3;//返回3
         }
-
+        //其它情况一样的扩容为 当前capacity*2
         // Normalize the current capacity to the power of 2.
         int newCapacity = alloc().calculateNewCapacity(writerIndex + minWritableBytes, maxCapacity);
 
         // Adjust to the new capacity.
-        capacity(newCapacity);
+        capacity(newCapacity);//真正的调整处理
         return 2;
     }
 
@@ -1446,7 +1461,7 @@ public abstract class AbstractByteBuf extends ByteBuf {
      * if the buffer was released before.
      */
     protected final void ensureAccessible() {
-        if (checkAccessible && internalRefCnt() == 0) {
+        if (checkAccessible && internalRefCnt() == 0) {//引用计数器=0了 说明已经释放不可再访问这块内存
             throw new IllegalReferenceCountException(0);
         }
     }

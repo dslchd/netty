@@ -24,21 +24,30 @@ import java.nio.ByteOrder;
 
 abstract class PooledByteBuf<T> extends AbstractReferenceCountedByteBuf {
 
+    /**Recycler 处理器用于回收对象**/
     private final Recycler.Handle<PooledByteBuf<T>> recyclerHandle;
-
+    /**chunk 对象**/
     protected PoolChunk<T> chunk;
+    /**从chunk对象中分配的内存块所处的位置**/
     protected long handle;
+    /**内存空间**/
     protected T memory;
+    /**memory 所处理的开始位置**/
     protected int offset;
+    /**memory 长度 其实就是容量capacity 目前memory长度**/
     protected int length;
+    /**memory占用大小**/
     int maxLength;
+
     PoolThreadCache cache;
+    /**temp ByteBuffer**/
     private ByteBuffer tmpNioBuf;
+    /**ByteBuf分配对象**/
     private ByteBufAllocator allocator;
 
     @SuppressWarnings("unchecked")
     protected PooledByteBuf(Recycler.Handle<? extends PooledByteBuf<T>> recyclerHandle, int maxCapacity) {
-        super(maxCapacity);
+        super(maxCapacity);//AbstractByteBuf maxCapacity init
         this.recyclerHandle = (Handle<PooledByteBuf<T>>) recyclerHandle;
     }
 
@@ -50,6 +59,7 @@ abstract class PooledByteBuf<T> extends AbstractReferenceCountedByteBuf {
         init0(chunk, 0, chunk.offset, length, length, null);
     }
 
+    //初始化PooledByteBuf
     private void init0(PoolChunk<T> chunk, long handle, int offset, int length, int maxLength, PoolThreadCache cache) {
         assert handle >= 0;
         assert chunk != null;
@@ -67,18 +77,23 @@ abstract class PooledByteBuf<T> extends AbstractReferenceCountedByteBuf {
 
     /**
      * Method must be called before reuse this {@link PooledByteBufAllocator}
+     * 重用
      */
     final void reuse(int maxCapacity) {
+        //设置maxCapacity
         maxCapacity(maxCapacity);
+        //设置引用计数器
         setRefCnt(1);
+        //重置reader writer 索引为0位置
         setIndex0(0, 0);
+        //把两个标识索引也置0
         discardMarks();
     }
 
     @Override
     public final int capacity() {
         return length;
-    }
+    } //返回当前capacity
 
     @Override
     public final ByteBuf capacity(int newCapacity) {
